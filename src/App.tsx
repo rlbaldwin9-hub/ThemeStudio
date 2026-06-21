@@ -117,6 +117,8 @@ export default function App() {
     setTypography(newTypography);
     if (newSections) {
       setSections(newSections);
+    } else {
+      setSections(INITIAL_SECTIONS);
     }
   };
 
