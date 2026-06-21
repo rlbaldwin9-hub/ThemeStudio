@@ -159,7 +159,7 @@ export default function ExportPanel({ colors, typography, sections }: ExportPane
       ${sec.ctaText ? `<a href="${sec.ctaUrl || '#'}" class="cta-button" target="_parent">${sec.ctaText}</a>` : ''}
     </div>
     <div class="split-image-holder">
-      <img src="${sec.imageUrl || 'https://images.unsplash.com/photo-1541462658141-2758733e30bc'}" class="image-media" alt="Featured Media" />
+      <img src="${sec.imageUrl || 'https://images.unsplash.com/photo-1507238691740-187a5b1d37b8?auto=format&fit=crop&w=800&q=80'}" class="image-media" alt="Featured Media" />
     </div>
   </div>`;
     } else if (sec.type === 'two-col') {

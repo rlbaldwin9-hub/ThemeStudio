@@ -1828,7 +1828,7 @@ export const INITIAL_SECTIONS: Section[] = [
     content: 'Google Sites embeds represent the finest way to display custom grids, tables, carousel cards, and interactive sliders. By copying our ready-to-use theme codes and inserting them into the Embed option, you completely upgrade your layout flexibility without paying for complex high-end hosting platforms.',
     ctaText: 'Explore Addons',
     ctaUrl: '#export-panel',
-    imageUrl: 'https://images.unsplash.com/photo-1541462608141-2758733e30bc?auto=format&fit=crop&w=800&q=80',
+    imageUrl: 'https://images.unsplash.com/photo-1507238691740-187a5b1d37b8?auto=format&fit=crop&w=800&q=80',
     imagePosition: 'right',
   },
   {

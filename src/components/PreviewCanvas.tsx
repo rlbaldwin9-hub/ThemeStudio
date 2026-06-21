@@ -688,7 +688,7 @@ export default function PreviewCanvas({
                           </div>
                           <div className={`${section.imagePosition === 'right' ? 'md:order-2' : 'md:order-1'}`}>
                             <img 
-                              src={section.imageUrl || 'https://images.unsplash.com/photo-1541462608141-2758733e30bc?auto=format&fit=crop&w=800&q=80'} 
+                              src={section.imageUrl || 'https://images.unsplash.com/photo-1507238691740-187a5b1d37b8?auto=format&fit=crop&w=800&q=80'} 
                               alt={section.title}
                               referrerPolicy="no-referrer"
                               className="w-full h-56 object-cover rounded-none border"
