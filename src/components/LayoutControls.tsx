@@ -493,8 +493,12 @@ export default function LayoutControls({
                 id={`active-row-${sec.id}`}
               >
                 {/* Header Row */}
-                <div className="flex items-center justify-between p-2.5 bg-[#FAF9F6] border-b border-[#E5E2DE] select-none">
-                  <div className="flex items-center gap-2 max-w-[65%]">
+                <div className="flex items-center justify-between p-2.5 bg-[#FAF9F6] border-b border-[#E5E2DE] select-none hover:bg-[#F6F5F0] transition-colors">
+                  <div 
+                    onClick={() => setActiveEditId(isEditing ? null : sec.id)}
+                    className="flex items-center gap-2 max-w-[65%] cursor-pointer hover:opacity-85 active:scale-[0.99] transition-all flex-1 py-1"
+                    title="Click row header to expand/collapse configuration settings"
+                  >
                     <span className="w-5 h-5 rounded-none bg-[#1A1A1A] text-white text-[10px] font-mono font-bold flex items-center justify-center shrink-0">
                       {idx + 1}
                     </span>
@@ -536,7 +540,7 @@ export default function LayoutControls({
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1 shrink-0">
                     <button
                       onClick={() => handleUpdateField(sec.id, 'hidden', !sec.hidden)}
                       className={`p-1 rounded-none ${sec.hidden ? 'text-rose-500 bg-rose-50 hover:bg-rose-100' : 'text-slate-400 hover:text-black hover:bg-white'}`}
@@ -569,17 +573,22 @@ export default function LayoutControls({
                     </button>
                     <button
                       onClick={() => handleDelete(sec.id)}
-                      className="p-1 rounded-none text-slate-400 hover:text-rose-600 hover:bg-white"
+                      className="p-1 rounded-none text-slate-400 hover:text-rose-600 hover:bg-white mr-1"
                       title="Delete Block"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                     <button
                       onClick={() => setActiveEditId(isEditing ? null : sec.id)}
-                      className={`p-1 rounded-none ${isEditing ? 'text-black bg-white' : 'text-slate-400 hover:text-black hover:bg-white'}`}
+                      className={`p-1 px-1.5 border rounded-none text-[8px] font-mono font-bold uppercase transition flex items-center gap-0.5 ${
+                        isEditing 
+                          ? 'bg-black text-white border-black hover:bg-neutral-800' 
+                          : 'bg-white text-emerald-700 border-emerald-200 hover:border-emerald-500 hover:bg-emerald-50'
+                      }`}
                       title="Toggle Configuration"
                     >
-                      {isEditing ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                      <span>{isEditing ? 'Close' : 'Configure'}</span>
+                      {isEditing ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                     </button>
                   </div>
                 </div>
@@ -644,25 +653,27 @@ export default function LayoutControls({
                       )}
 
                       {/* CTA option items */}
-                      {sec.ctaText !== undefined && (
+                      {(sec.ctaText !== undefined || sec.type === 'hero' || sec.type === 'split' || sec.type === 'pricing') && (
                         <div className="space-y-1">
-                          <label className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block">CTA Text</label>
+                          <label className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block">CTA Button Text</label>
                           <input
                             type="text"
-                            value={sec.ctaText}
+                            value={sec.ctaText || ''}
                             onChange={(e) => handleUpdateField(sec.id, 'ctaText', e.target.value)}
                             className="w-full p-1.5 border border-[#E5E2DE] rounded-none focus:border-black focus:outline-none text-[#1A1A1A] text-xs"
+                            placeholder="e.g. Build Custom Template"
                           />
                         </div>
                       )}
-                      {sec.ctaUrl !== undefined && (
+                      {(sec.ctaUrl !== undefined || sec.type === 'hero' || sec.type === 'split' || sec.type === 'pricing') && (
                         <div className="space-y-1">
                           <label className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block">CTA URL Link</label>
                           <input
                             type="text"
-                            value={sec.ctaUrl}
+                            value={sec.ctaUrl || ''}
                             onChange={(e) => handleUpdateField(sec.id, 'ctaUrl', e.target.value)}
                             className="w-full p-1.5 border border-[#E5E2DE] rounded-none focus:border-black focus:outline-none text-[#1A1A1A] text-xs font-mono text-[10px]"
+                            placeholder="e.g. https://themes.rlbdesigns.com"
                           />
                         </div>
                       )}
