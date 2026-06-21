@@ -1,0 +1,6 @@
+{
+  "name": "RLB Designs Theme Studio",
+  "description": "An interactive theme builder and section template designer for Google Sites. Customize color palettes, Google Fonts, and sections with responsive real-time previews, and export CSS options, custom theme JSON structures, and Google Sites embed codes.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
