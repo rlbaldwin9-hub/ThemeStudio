@@ -12,7 +12,7 @@ interface ExportPanelProps {
 }
 
 export default function ExportPanel({ colors, typography, sections }: ExportPanelProps) {
-  const [activeTab, setActiveTab] = useState<'json' | 'css' | 'html-embed' | 'guide'>('json');
+  const [activeTab, setActiveTab] = useState<'json' | 'css' | 'html-embed' | 'html-full' | 'guide'>('json');
   const [selectedEmbedSecId, setSelectedEmbedSecId] = useState<string>(sections[0]?.id || '');
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -774,6 +774,736 @@ export default function ExportPanel({ colors, typography, sections }: ExportPane
 </html>`;
   };
 
+  const compileFullPageEmbedCode = () => {
+    const activeSections = sections.filter(s => !s.hidden);
+    if (activeSections.length === 0) return '<!-- No active rows to embed. Add some rows first in the active sidebar list! -->';
+
+    const fontsToLoad = Array.from(new Set([
+      typography.title.family,
+      typography.heading.family,
+      typography.body.family
+    ])).map(f => f.replace(/\s+/g, '+')).join('&family=');
+
+    // Generate HTML for each active section
+    const activeSectionsHtml = activeSections.map((sec) => {
+      let sectionInnerHtml = '';
+
+      if (sec.type === 'hero') {
+        const hasCustomBg = sec.imageUrl && sec.imageUrl.trim() !== '';
+        if (hasCustomBg) {
+          sectionInnerHtml = `
+  <div class="hero-banner-visual" style="background-image: linear-gradient(rgba(0,0,0,${((100 - (sec.bannerOpacity ?? 96)) / 100).toFixed(2)}), rgba(0,0,0,${((100 - (sec.bannerOpacity ?? 96)) / 100).toFixed(2)})), url('${sec.imageUrl}');">
+    <div class="hero-container" style="background-color: rgba(255, 255, 255, ${(sec.bannerOpacity ?? 96) / 100}); padding: 40px; border-radius: 8px; border: 1px solid ${colors.dividerColor}; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);">
+      <h1 class="hero-title">${sec.title}</h1>
+      ${sec.subtitle ? `<p class="hero-subtitle">${sec.subtitle}</p>` : ''}
+      ${sec.content ? `<p class="hero-body">${sec.content}</p>` : ''}
+      ${sec.ctaText ? `<a href="${sec.ctaUrl || '#'}" class="cta-button" target="_parent">${sec.ctaText}</a>` : ''}
+    </div>
+  </div>`;
+        } else {
+          sectionInnerHtml = `
+  <div class="hero-container">
+    <h1 class="hero-title">${sec.title}</h1>
+    ${sec.subtitle ? `<p class="hero-subtitle">${sec.subtitle}</p>` : ''}
+    ${sec.content ? `<p class="hero-body">${sec.content}</p>` : ''}
+    ${sec.ctaText ? `<a href="${sec.ctaUrl || '#'}" class="cta-button" target="_parent">${sec.ctaText}</a>` : ''}
+  </div>`;
+        }
+      } else if (sec.type === 'features') {
+        const itemsHtml = sec.items?.map(item => `
+      <div class="feature-card">
+        <div class="custom-badge-icon">✓</div>
+        <h3 class="feature-title">${item.title}</h3>
+        <p class="feature-desc">${item.description}</p>
+      </div>`).join('') || '';
+
+        sectionInnerHtml = `
+  <div class="center-banner">
+    <h2 class="section-heading">${sec.title}</h2>
+    ${sec.subtitle ? `<p class="section-lead">${sec.subtitle}</p>` : ''}
+  </div>
+  <div class="grid-layout-3">
+    ${itemsHtml}
+  </div>`;
+      } else if (sec.type === 'split') {
+        sectionInnerHtml = `
+  <div class="split-wrapper ${sec.imagePosition === 'left' ? 'reverse-flow' : ''}">
+    <div class="split-content">
+      <h2 class="section-heading">${sec.title}</h2>
+      ${sec.subtitle ? `<div class="p-accent">${sec.subtitle}</div>` : ''}
+      <p class="body-paragraphs">${sec.content || ''}</p>
+      ${sec.ctaText ? `<a href="${sec.ctaUrl || '#'}" class="cta-button" target="_parent">${sec.ctaText}</a>` : ''}
+    </div>
+    <div class="split-image-holder">
+      <img src="${sec.imageUrl || 'https://images.unsplash.com/photo-1507238691740-187a5b1d37b8?auto=format&fit=crop&w=800&q=80'}" class="image-media" alt="Featured Media" />
+    </div>
+  </div>`;
+      } else if (sec.type === 'two-col') {
+        const colHtml = sec.items?.map(it => `
+      <div class="two-col-box">
+        <h3 class="feature-title" style="display:inline-block; margin-bottom:8px;">${it.title}</h3>
+        <p class="feature-desc">${it.description}</p>
+      </div>`).join('') || '';
+
+        sectionInnerHtml = `
+  <div class="center-banner">
+    <h2 class="section-heading">${sec.title}</h2>
+    ${sec.subtitle ? `<p class="section-lead">${sec.subtitle}</p>` : ''}
+  </div>
+  <div class="grid-layout-2">
+    ${colHtml}
+  </div>`;
+      } else if (sec.type === 'bento') {
+        const itemsHtml = sec.items?.map((it, idx) => `
+      <div class="bento-box ${idx === 0 ? 'bento-grid-wide' : ''}">
+        <div>
+          ${it.tag ? `<span class="tag-badge">${it.tag}</span>` : ''}
+          <h3 class="bento-title">${it.title}</h3>
+          <p class="feature-desc">${it.description}</p>
+        </div>
+      </div>`).join('') || '';
+
+        sectionInnerHtml = `
+  <div class="center-banner">
+    <h2 class="section-heading">${sec.title}</h2>
+    ${sec.subtitle ? `<p class="section-lead">${sec.subtitle}</p>` : ''}
+  </div>
+  <div class="grid-layout-3">
+    ${itemsHtml}
+  </div>`;
+      } else if (sec.type === 'faq') {
+        const itemsHtml = sec.items?.map(it => `
+      <div class="faq-row">
+        <div class="faq-q">❓ ${it.title}</div>
+        <div class="faq-a">${it.description}</div>
+      </div>`).join('') || '';
+
+        sectionInnerHtml = `
+  <div class="center-banner" style="max-width: 600px; margin: 0 auto 32px auto;">
+    <h2 class="section-heading">${sec.title}</h2>
+    ${sec.subtitle ? `<p class="section-lead">${sec.subtitle}</p>` : ''}
+  </div>
+  <div class="list-holder">
+    ${itemsHtml}
+  </div>`;
+      } else if (sec.type === 'testimonials') {
+        const itemsHtml = sec.items?.map(it => `
+      <div class="faq-row" style="border-radius:16px;">
+        <div style="color:#fbbf24; font-size:16px; margin-bottom:8px;">★★★★★</div>
+        <p class="testimonial-text">"${it.description}"</p>
+        <div style="border-top:1px solid ${colors.dividerColor}; padding-top:8px; margin-top:12px; display:flex; justify-content:space-between; font-weight:bold; font-size:11px;">
+          <span>${it.title}</span>
+          <span style="opacity:0.6;">${it.tag || 'Client'}</span>
+        </div>
+      </div>`).join('') || '';
+
+        sectionInnerHtml = `
+  <div class="center-banner">
+    <h2 class="section-heading">${sec.title}</h2>
+    ${sec.subtitle ? `<p class="section-lead">${sec.subtitle}</p>` : ''}
+  </div>
+  <div class="grid-layout-2">
+    ${itemsHtml}
+  </div>`;
+      } else if (sec.type === 'link-in-bio') {
+        const itemsHtml = sec.items?.map(it => `
+    <a href="${it.url || '#'}" class="link-bio-row" target="_parent">
+      <div>
+        <span class="bio-title">${it.title}</span>
+        <span class="bio-desc">${it.description}</span>
+      </div>
+      <div class="bio-arrow">➔</div>
+    </a>`).join('') || '';
+
+        sectionInnerHtml = `
+  <div class="center-banner" style="max-width:440px; margin:0 auto 24px auto;">
+    <h3 class="section-heading">${sec.title}</h3>
+    ${sec.subtitle ? `<p class="section-lead">${sec.subtitle}</p>` : ''}
+  </div>
+  <div class="bio-list">
+    ${itemsHtml}
+  </div>`;
+      } else if (sec.type === 'pricing') {
+        const itemsHtml = sec.items?.map(it => `
+      <div class="pricing-tier ${it.tag ? 'tier-highlighted' : ''}">
+        ${it.tag ? `<div class="highlight-badge">${it.tag}</div>` : ''}
+        <h3 class="bento-title">${it.title}</h3>
+        <p class="feature-desc" style="margin-bottom:16px;">${it.description}</p>
+        <div class="price-container">
+          <span class="price-val">${it.price}</span>
+          <span class="price-sub">/ standard fee</span>
+        </div>
+        <button class="pricing-btn ${it.tag ? 'primary-tier-btn' : ''}">${it.ctaText || 'Purchase'}</button>
+      </div>`).join('') || '';
+
+        sectionInnerHtml = `
+  <div class="center-banner">
+    <h2 class="section-heading">${sec.title}</h2>
+    ${sec.subtitle ? `<p class="section-lead">${sec.subtitle}</p>` : ''}
+  </div>
+  <div class="grid-layout-2" style="max-width: 680px; margin: 0 auto;">
+    ${itemsHtml}
+  </div>`;
+      } else if (sec.type === 'footer') {
+        const itemsHtml = sec.items?.map(it => `
+      <div>
+        <span class="foot-header">${it.title}</span>
+        <a href="${it.url || '#'}" class="foot-guide-item" target="_parent">${it.description}</a>
+      </div>`).join('') || '';
+
+        sectionInnerHtml = `
+  <div class="footer-layout">
+    <div>
+      <span class="footer-title">✦ ${sec.title}</span>
+      <p class="footer-credit">${sec.subtitle || ''}</p>
+    </div>
+    <div class="footer-columns">
+      ${itemsHtml}
+    </div>
+  </div>`;
+      }
+
+      return `
+  <!-- Section ${sec.type.toUpperCase()}: ${sec.title} -->
+  <section class="outer-section sec-${sec.type}" id="section-${sec.id}">
+    ${sectionInnerHtml}
+  </section>`;
+    }).join('\n');
+
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Google Sites Custom Full Page Embed Code</title>
+  
+  <!-- Dynamically loading the selected Google Font Family -->
+  <link href="https://fonts.googleapis.com/css2?family=${fontsToLoad}&display=swap" rel="stylesheet">
+  
+  <style>
+    /* Absolute Theme Reset and Isolation */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    html, body {
+      font-family: "${typography.body.family}", sans-serif;
+      font-size: ${typography.body.size};
+      color: ${colors.textColor};
+      background-color: ${colors.primaryBg};
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Full-screen aesthetic row-by-row structure */
+    .outer-section {
+      width: 100%;
+      padding: 60px 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      border-bottom: 1px solid ${colors.dividerColor};
+    }
+
+    /* Alternate section backgrounds slightly to create rich pacing */
+    .sec-hero {
+      background-color: ${colors.primaryBg};
+    }
+    .sec-features {
+      background-color: ${colors.secondaryBg};
+    }
+    .sec-bento {
+      background-color: ${colors.secondaryBg};
+    }
+    .sec-split {
+      background-color: ${colors.primaryBg};
+    }
+    .sec-two-col {
+      background-color: ${colors.primaryBg};
+    }
+    .sec-faq {
+      background-color: ${colors.secondaryBg};
+    }
+    .sec-testimonials {
+      background-color: ${colors.primaryBg};
+    }
+    .sec-link-in-bio {
+      background-color: ${colors.primaryBg};
+    }
+    .sec-pricing {
+      background-color: ${colors.secondaryBg};
+    }
+    .sec-footer {
+      background-color: ${colors.primaryBg};
+      border-bottom: none;
+      padding: 48px 20px;
+    }
+
+    /* Core Utility Classes mapped from designer properties */
+    .hero-container {
+      text-align: center;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    .hero-banner-visual {
+      width: 100%;
+      background-size: cover;
+      background-position: center;
+      min-height: 480px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+      border-radius: 12px;
+      margin: 0 auto;
+      max-width: 1100px;
+    }
+
+    .hero-title {
+      font-family: "${typography.title.family}", sans-serif;
+      font-weight: ${typography.title.weight};
+      font-size: ${typography.title.size};
+      color: ${colors.headingColor};
+      letter-spacing: ${typography.title.letterSpacing};
+      line-height: 1.15;
+      margin-bottom: 16px;
+    }
+
+    .hero-subtitle {
+      font-size: 1.1rem;
+      opacity: 0.85;
+      margin-bottom: 24px;
+      max-width: 600px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .hero-body {
+      font-size: 0.9rem;
+      opacity: 0.65;
+      margin-bottom: 24px;
+    }
+
+    .section-heading {
+      font-family: "${typography.heading.family}", sans-serif;
+      font-weight: ${typography.heading.weight};
+      font-size: ${typography.heading.size};
+      color: ${colors.headingColor};
+      letter-spacing: ${typography.heading.letterSpacing};
+      line-height: 1.25;
+      margin-bottom: 12px;
+    }
+
+    .section-lead {
+      font-size: 0.95rem;
+      opacity: 0.75;
+      margin-bottom: 32px;
+    }
+
+    .center-banner {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    /* Column Symmetrical Layouts */
+    .grid-layout-3 {
+      display: grid;
+      grid-template-columns: repeat(1, minmax(0, 1fr));
+      gap: 20px;
+      width: 100%;
+      max-width: 960px;
+    }
+
+    .grid-layout-2 {
+      display: grid;
+      grid-template-columns: repeat(1, minmax(0, 1fr));
+      gap: 20px;
+      width: 100%;
+      max-width: 960px;
+    }
+
+    @media (min-width: 640px) {
+      .grid-layout-3 {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+      .grid-layout-2 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    .feature-card {
+      background-color: ${colors.primaryBg};
+      border: 1px solid ${colors.dividerColor};
+      padding: 24px;
+      border-radius: 12px;
+      transition: border-color 0.2s ease;
+    }
+
+    .custom-badge-icon {
+      width: 32px;
+      height: 32px;
+      background-color: ${colors.secondaryBg};
+      color: ${colors.primaryButtonBg};
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 14px;
+      margin-bottom: 16px;
+    }
+
+    .feature-title {
+      font-family: "${typography.heading.family}", sans-serif;
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: ${colors.headingColor};
+      margin-bottom: 8px;
+    }
+
+    .feature-desc {
+      font-size: 0.85rem;
+      opacity: 0.8;
+      line-height: 1.5;
+    }
+
+    /* Asymmetric Split Columns */
+    .split-wrapper {
+      display: flex;
+      flex-direction: column;
+      gap: 32px;
+      max-width: 960px;
+      align-items: center;
+    }
+
+    @media (min-width: 768px) {
+      .split-wrapper {
+        flex-direction: row;
+      }
+      .reverse-flow {
+        flex-direction: row-reverse;
+      }
+      .split-content, .split-image-holder {
+        flex: 1;
+      }
+    }
+
+    .split-content {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .p-accent {
+      color: ${colors.primaryButtonBg};
+      font-weight: bold;
+      font-size: 0.9rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .body-paragraphs {
+      font-size: 0.95rem;
+      opacity: 0.8;
+      line-height: 1.6;
+    }
+
+    .split-image-holder {
+      width: 100%;
+    }
+
+    .image-media {
+      width: 100%;
+      height: 320px;
+      object-fit: cover;
+      border-radius: 16px;
+      border: 1px solid ${colors.dividerColor};
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    }
+
+    .two-col-box {
+      background-color: ${colors.primaryBg};
+      border: 1px solid ${colors.dividerColor};
+      padding: 24px;
+      border-radius: 16px;
+    }
+
+    /* Bento visual structures */
+    .bento-box {
+      background-color: ${colors.primaryBg};
+      border: 1px solid ${colors.dividerColor};
+      padding: 24px;
+      border-radius: 16px;
+      min-height: 160px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    @media (min-width: 640px) {
+      .bento-grid-wide {
+        grid-column: span 2;
+        background-color: ${colors.secondaryBg};
+      }
+    }
+
+    .bento-title {
+      font-family: "${typography.heading.family}", sans-serif;
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: ${colors.headingColor};
+      margin-bottom: 6px;
+    }
+
+    .tag-badge {
+      background-color: ${colors.primaryButtonBg};
+      color: ${colors.primaryButtonText};
+      font-size: 9px;
+      font-weight: bold;
+      padding: 4px 10px;
+      border-radius: 20px;
+      display: inline-block;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+    }
+
+    /* FAQs details cards list */
+    .list-holder {
+      width: 100%;
+      max-width: 680px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .faq-row {
+      background-color: ${colors.primaryBg};
+      border: 1px solid ${colors.dividerColor};
+      border-radius: 12px;
+      padding: 16px 20px;
+      text-align: left;
+    }
+
+    .faq-q {
+      font-family: "${typography.heading.family}", sans-serif;
+      font-weight: 700;
+      font-size: 0.95rem;
+      color: ${colors.headingColor};
+      margin-bottom: 6px;
+    }
+
+    .faq-a {
+      font-size: 0.85rem;
+      opacity: 0.8;
+      border-top: 1px solid ${colors.dividerColor};
+      padding-top: 8px;
+      margin-top: 8px;
+    }
+
+    /* CTA buttons layout */
+    .cta-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background-color: ${colors.primaryButtonBg};
+      color: ${colors.primaryButtonText};
+      text-decoration: none;
+      font-weight: bold;
+      font-size: 0.9rem;
+      padding: 12px 28px;
+      border-radius: 6px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      border: none;
+      cursor: pointer;
+      width: fit-content;
+      transition: opacity 0.2s;
+    }
+
+    .cta-button:hover {
+      opacity: 0.93;
+    }
+
+    /* Bio links options style */
+    .bio-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      width: 100%;
+      max-width: 440px;
+      margin: 0 auto;
+    }
+
+    .link-bio-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 14px 20px;
+      background-color: ${colors.primaryBg};
+      border: 1px solid ${colors.dividerColor};
+      border-radius: 12px;
+      text-decoration: none;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+      transition: transform 0.2s ease, border-color 0.2s ease;
+    }
+
+    .link-bio-row:hover {
+      transform: translateY(-1px);
+      border-color: ${colors.primaryButtonBg};
+    }
+
+    .bio-title {
+      font-family: "${typography.heading.family}", sans-serif;
+      font-size: 0.9rem;
+      font-weight: bold;
+      color: ${colors.headingColor};
+      display: block;
+    }
+
+    .bio-desc {
+      font-size: 10px;
+      opacity: 0.75;
+      display: block;
+      margin-top: 2px;
+    }
+
+    .bio-arrow {
+      font-size: 12px;
+      color: ${colors.primaryButtonBg};
+    }
+
+    /* Pricing Plans structures */
+    .pricing-tier {
+      background-color: ${colors.primaryBg};
+      border: 1px solid ${colors.dividerColor};
+      border-radius: 16px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+    }
+
+    .tier-highlighted {
+      box-shadow: 0 0 0 2px ${colors.primaryButtonBg};
+    }
+
+    .highlight-badge {
+      position: absolute;
+      top: -12px;
+      left: 20px;
+      background-color: ${colors.primaryButtonBg};
+      color: ${colors.primaryButtonText};
+      font-size: 9px;
+      font-weight: bold;
+      padding: 4px 12px;
+      border-radius: 12px;
+      text-transform: uppercase;
+    }
+
+    .price-container {
+      display: flex;
+      align-items: baseline;
+      margin-bottom: 20px;
+    }
+
+    .price-val {
+      font-family: "${typography.heading.family}", sans-serif;
+      font-size: 1.8rem;
+      font-weight: 800;
+      color: ${colors.headingColor};
+    }
+
+    .price-sub {
+      font-size: 10px;
+      opacity: 0.6;
+      margin-left: 6px;
+    }
+
+    .pricing-btn {
+      width: 100%;
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: bold;
+      border: none;
+      background-color: ${colors.secondaryButtonBg};
+      color: ${colors.secondaryButtonText};
+      cursor: pointer;
+    }
+
+    .primary-tier-btn {
+      background-color: ${colors.primaryButtonBg};
+      color: ${colors.primaryButtonText};
+    }
+
+    /* Footer layouts styling */
+    .footer-layout {
+      padding-top: 10px;
+      width: 100%;
+      max-width: 960px;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 24px;
+    }
+
+    @media (min-width: 768px) {
+      .footer-layout {
+        grid-template-columns: 1fr 2fr;
+      }
+    }
+
+    .footer-title {
+      font-family: "${typography.heading.family}", sans-serif;
+      font-weight: bold;
+      font-size: 1rem;
+      color: ${colors.headingColor};
+    }
+
+    .footer-credit {
+      font-size: 10px;
+      opacity: 0.7;
+    }
+
+    .footer-columns {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .foot-header {
+      font-size: 9px;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      opacity: 0.6;
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    .foot-guide-item {
+      font-size: 0.85rem;
+      font-weight: bold;
+      color: ${colors.primaryButtonBg};
+      text-decoration: none;
+    }
+
+    .foot-guide-item:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  
+  ${activeSectionsHtml}
+
+</body>
+</html>`;
+  };
+
   const selectedEmbedSec = sections.find(s => s.id === selectedEmbedSecId) || sections[0];
   const compiledEmbedCode = selectedEmbedSec ? compileSectionEmbedCode(selectedEmbedSec) : '';
 
@@ -822,6 +1552,14 @@ export default function ExportPanel({ colors, typography, sections }: ExportPane
           >
             <Layers className="w-3.5 h-3.5" />
             Embed Elements
+          </button>
+          <button
+            onClick={() => setActiveTab('html-full')}
+            className={`p-1 px-3 text-xs rounded font-bold transition flex items-center gap-1 cursor-pointer focus:outline-none ${activeTab === 'html-full' ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
+            id="tab-export-embed-full"
+          >
+            <Layers className="w-3.5 h-3.5 text-emerald-500" />
+            Full Page Embed
           </button>
           <button
             onClick={() => setActiveTab('guide')}
@@ -930,6 +1668,56 @@ export default function ExportPanel({ colors, typography, sections }: ExportPane
 
           <pre className="bg-slate-900 border border-slate-950 p-4 rounded-xl text-[11px] font-mono text-emerald-250 overflow-x-auto max-h-[300px]">
             {compiledEmbedCode}
+          </pre>
+        </div>
+      )}
+
+      {activeTab === 'html-full' && (
+        <div className="space-y-4 animation-fade-in text-left">
+          <div className="p-3.5 bg-emerald-50/50 border border-emerald-150 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="space-y-0.5">
+              <span className="text-[10px] uppercase font-extrabold text-emerald-700 tracking-wider flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                Full Page Sub-Page Compiler
+              </span>
+              <h4 className="text-xs font-bold text-slate-800">Export All Active Rows ({sections.filter(s => !s.hidden).length}) as Full-Page Embed</h4>
+              <p className="text-[11.5px] text-slate-500">Perfect for rendering entire seamless custom landing/sub-pages within a Google Sites full page EMBED iframe frame.</p>
+            </div>
+
+            <div className="flex gap-2 shrink-0">
+              <button
+                disabled={sections.filter(s => !s.hidden).length === 0}
+                onClick={() => handleCopyText('fullpage', compileFullPageEmbedCode())}
+                className="p-1.5 px-3 border border-slate-200 hover:border-slate-350 bg-white font-bold rounded text-xs text-slate-700 flex items-center gap-1.5 focus:outline-none cursor-pointer"
+                id="btn-copy-fullpage-code"
+              >
+                {copiedId === 'fullpage' ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                {copiedId === 'fullpage' ? 'Copied Full HTML!' : 'Copy Page Code'}
+              </button>
+              <button
+                disabled={sections.filter(s => !s.hidden).length === 0}
+                onClick={() => triggerDownloadObj('google-sites-embed-page.html', compileFullPageEmbedCode())}
+                className="p-1.5 px-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-45 disabled:pointer-events-none rounded text-xs font-bold text-white flex items-center gap-1.5 focus:outline-none cursor-pointer"
+                id="btn-download-fullpage"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Download Sub-Page HTML
+              </button>
+            </div>
+          </div>
+
+          <div className="text-[11px] text-slate-600 leading-relaxed bg-slate-50 p-3 border border-slate-200">
+            <h5 className="font-bold text-slate-700 mb-1">🚀 How to Deploy Full Page Sub-Pages on Google Sites:</h5>
+            <ol className="list-decimal pl-4 space-y-1">
+              <li>In Google Sites editor, go to the <strong>Pages</strong> tab (right panel) &gt; Click the <strong>"+"</strong> button &gt; Select <strong>"Full page embed"</strong> (icon with brackets).</li>
+              <li>Give your new page a name (e.g., <em>"About Us"</em> or <em>"Custom Pricing"</em>) and click <strong>Done</strong>.</li>
+              <li>On the new blank page canvas, click the <strong>Add Embed</strong> button &gt; Select the <strong>"Embed Code"</strong> tab.</li>
+              <li>Paste the full-page HTML code copied below (or open the downloaded <code>google-sites-embed-page.html</code> file and copy all its contents) &gt; click <strong>Next</strong> &gt; click <strong>Insert</strong>.</li>
+            </ol>
+          </div>
+
+          <pre className="bg-slate-900 border border-slate-950 p-4 rounded-xl text-[11px] font-mono text-emerald-250 overflow-x-auto max-h-[350px]">
+            {compileFullPageEmbedCode()}
           </pre>
         </div>
       )}
