@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ColorPalette, TypographySettings, Section, ViewportMode, APP_VERSION } from './types';
+import { ColorPalette, TypographySettings, Section, ViewportMode, APP_VERSION, normalizeColors, normalizeTypography } from './types';
 import { PRESET_THEMES, INITIAL_SECTIONS } from './presets';
 import ColorControls from './components/ColorControls';
 import TypographyControls from './components/TypographyControls';
@@ -15,8 +15,8 @@ import {
 
 export default function App() {
   // State variables coordinating the active canvas properties
-  const [colors, setColors] = useState<ColorPalette>(PRESET_THEMES[0].colors);
-  const [typography, setTypography] = useState<TypographySettings>(PRESET_THEMES[0].typography);
+  const [colors, setColors] = useState<ColorPalette>(normalizeColors(PRESET_THEMES[0].colors));
+  const [typography, setTypography] = useState<TypographySettings>(normalizeTypography(PRESET_THEMES[0].typography));
   const [sections, setSections] = useState<Section[]>(INITIAL_SECTIONS);
   const [activeSidebarTab, setActiveSidebarTab] = useState<'presets' | 'colors' | 'fonts' | 'sections' | 'library'>('presets');
   const [viewportMode, setViewportMode] = useState<ViewportMode>('desktop');
@@ -49,10 +49,10 @@ export default function App() {
     const cachedShowComparison = localStorage.getItem('gsites_designer_showComparison');
 
     if (cachedColors) {
-      try { setColors(JSON.parse(cachedColors)); } catch (e) {}
+      try { setColors(normalizeColors(JSON.parse(cachedColors))); } catch (e) {}
     }
     if (cachedTypography) {
-      try { setTypography(JSON.parse(cachedTypography)); } catch (e) {}
+      try { setTypography(normalizeTypography(JSON.parse(cachedTypography))); } catch (e) {}
     }
     if (cachedSections) {
       try { setSections(JSON.parse(cachedSections)); } catch (e) {}
@@ -113,8 +113,8 @@ export default function App() {
     newTypography: TypographySettings,
     newSections?: Section[]
   ) => {
-    setColors(newColors);
-    setTypography(newTypography);
+    setColors(normalizeColors(newColors));
+    setTypography(normalizeTypography(newTypography));
     if (newSections) {
       setSections(newSections);
     } else {
@@ -125,8 +125,8 @@ export default function App() {
   // Re-establish original default starter configurations
   const handleResetToDefault = () => {
     if (window.confirm('Are you sure you want to reset current styling and sections to the Warm Editorial preset starter?')) {
-      setColors(PRESET_THEMES[0].colors);
-      setTypography(PRESET_THEMES[0].typography);
+      setColors(normalizeColors(PRESET_THEMES[0].colors));
+      setTypography(normalizeTypography(PRESET_THEMES[0].typography));
       setSections(INITIAL_SECTIONS);
       setActiveSidebarTab('presets');
     }

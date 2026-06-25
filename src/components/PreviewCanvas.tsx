@@ -20,6 +20,35 @@ interface PreviewCanvasProps {
   setShowComparison?: (val: boolean) => void;
 }
 
+const normalizeUrl = (url: string | undefined): string => {
+  if (!url) return '#';
+  const trimmed = url.trim();
+  if (trimmed === '' || trimmed === '#') return '#';
+  
+  if (
+    /^(https?:)?\/\//i.test(trimmed) || 
+    trimmed.startsWith('#') || 
+    trimmed.startsWith('/') || 
+    trimmed.startsWith('mailto:') || 
+    trimmed.startsWith('tel:')
+  ) {
+    return trimmed;
+  }
+  
+  if (trimmed.includes('.') && !trimmed.includes(' ')) {
+    return `https://${trimmed}`;
+  }
+  
+  return trimmed;
+};
+
+const getLinkTarget = (url: string | undefined): string => {
+  if (!url) return '_self';
+  const norm = normalizeUrl(url);
+  if (norm.startsWith('#')) return '_self';
+  return '_blank';
+};
+
 export default function PreviewCanvas({ 
   colors, 
   typography, 
@@ -39,6 +68,30 @@ export default function PreviewCanvas({
   const [activeSubPage, setActiveSubPage] = React.useState<string>('Home');
   const [multiPageMode, setMultiPageMode] = React.useState<boolean>(true);
   const [domain, setDomain] = React.useState<string>('https://sites.google.com/view/custom-editorial-theme');
+
+  // Interactive link toast notification and iframe escape helper
+  const [toastMessage, setToastMessage] = React.useState<string | null>(null);
+
+  const handleLinkClick = (e: React.MouseEvent<HTMLAnchorElement>, url: string | undefined) => {
+    const norm = normalizeUrl(url);
+    if (!url || norm === '#' || norm === '') {
+      e.preventDefault();
+      setToastMessage("ℹ️ Internal section link clicked (Navigation simulation)");
+      setTimeout(() => setToastMessage(null), 3000);
+      return;
+    }
+    
+    // Display our polished, real-time indicator to clarify what happens inside the Sites sandbox
+    setToastMessage(`🔗 Navigating to: ${norm}`);
+    setTimeout(() => setToastMessage(null), 4000);
+
+    // Some sandboxed iframes block standard link actions. We attempt programatic window opening as a bulletproof escape
+    try {
+      window.open(norm, '_blank', 'noopener,noreferrer');
+    } catch (err) {
+      console.warn("Popup blocked by sandboxed iframe environment. Standard link click will also attempt to route.", err);
+    }
+  };
 
   // Floating Site Comparator state properties
   const [overlayPos, setOverlayPos] = React.useState({ x: 30, y: 150 });
@@ -285,7 +338,10 @@ export default function PreviewCanvas({
                 })}
               </div>
               <a 
-                href={headerCtaUrl || '#'}
+                href={normalizeUrl(headerCtaUrl)}
+                target={getLinkTarget(headerCtaUrl)}
+                rel="noopener noreferrer"
+                onClick={(e) => handleLinkClick(e, headerCtaUrl)}
                 className="p-1.5 px-3 rounded-none text-[9px] uppercase font-mono tracking-wider transition flex items-center gap-1 cursor-pointer focus:outline-none border hover:opacity-90 font-bold"
                 style={{
                   backgroundColor: colors.primaryButtonBg,
@@ -461,31 +517,50 @@ export default function PreviewCanvas({
                 }
 
                 return visibleSections.map((section, sectionIdx) => {
-                  // Alternating row background for neat modular display list styling
-                  const isAlternate = sectionIdx % 2 === 1;
-                  const sectionBg = isAlternate ? colors.secondaryBg : colors.primaryBg;
-
-                  const headingStyle = {
-                    fontFamily: `"${typography.heading.family}", sans-serif`,
-                    fontWeight: typography.heading.weight,
-                    color: typography.heading.color || colors.headingColor,
-                    fontSize: getFontSizeStr(typography.heading.size, 'heading'),
-                  };
+                  // Alternating three background styles precisely as defined in Google Sites theme variations
+                  const styleIndex = sectionIdx % 3;
+                  const sectionBg = 
+                    styleIndex === 0 ? colors.primaryBg : 
+                    styleIndex === 1 ? colors.secondaryBg : 
+                    (colors.tertiaryBg || colors.secondaryBg);
 
                   const titleStyle = {
-                    fontFamily: `"${typography.title.family}", sans-serif`,
-                    fontWeight: typography.title.weight,
-                    color: typography.title.color || colors.headingColor,
-                    letterSpacing: typography.title.letterSpacing,
-                    fontSize: getFontSizeStr(typography.title.size, 'title'),
+                    fontFamily: `"${typography.title?.family || typography.heading?.family || 'Playfair Display'}", sans-serif`,
+                    fontWeight: typography.title?.weight || '700',
+                    color: typography.title?.color || colors.titleColor || colors.headingColor,
+                    letterSpacing: typography.title?.letterSpacing || '0em',
+                    fontSize: getFontSizeStr(typography.title?.size || '48px', 'title'),
+                  };
+
+                  const headingStyle = {
+                    fontFamily: `"${typography.heading?.family || 'Playfair Display'}", sans-serif`,
+                    fontWeight: typography.heading?.weight || '600',
+                    color: typography.heading?.color || colors.headingColor,
+                    fontSize: getFontSizeStr(typography.heading?.size || '24px', 'heading'),
+                  };
+
+                  const subheadingStyle = {
+                    fontFamily: `"${typography.subheading?.family || typography.heading?.family || 'Playfair Display'}", sans-serif`,
+                    fontWeight: typography.subheading?.weight || '500',
+                    color: typography.subheading?.color || colors.subheadingColor || colors.headingColor,
+                    letterSpacing: typography.subheading?.letterSpacing || '0em',
+                    fontSize: getFontSizeStr(typography.subheading?.size || '18px', 'heading'),
                   };
 
                   const bodyStyle = {
-                    fontFamily: `"${typography.body.family}", sans-serif`,
-                    fontWeight: typography.body.weight,
-                    color: typography.body.color || colors.textColor,
-                    letterSpacing: typography.body.letterSpacing,
-                    fontSize: getFontSizeStr(typography.body.size, 'body'),
+                    fontFamily: `"${typography.body?.family || 'Inter'}", sans-serif`,
+                    fontWeight: typography.body?.weight || '400',
+                    color: typography.body?.color || colors.bodyTextColor || colors.textColor,
+                    letterSpacing: typography.body?.letterSpacing || '0em',
+                    fontSize: getFontSizeStr(typography.body?.size || '14px', 'body'),
+                  };
+
+                  const smallTextStyle = {
+                    fontFamily: `"${typography.smallText?.family || typography.body?.family || 'Inter'}", sans-serif`,
+                    fontWeight: typography.smallText?.weight || '400',
+                    color: typography.smallText?.color || colors.smallTextColor || colors.textColor,
+                    letterSpacing: typography.smallText?.letterSpacing || '0.01em',
+                    fontSize: getFontSizeStr(typography.smallText?.size || '11px', 'body'),
                   };
 
                   return (
@@ -574,7 +649,10 @@ export default function PreviewCanvas({
                                 {section.ctaText && (
                                   <div className="pt-1.5">
                                     <a
-                                      href={section.ctaUrl || '#'}
+                                      href={normalizeUrl(section.ctaUrl)}
+                                      target={getLinkTarget(section.ctaUrl)}
+                                      rel="noopener noreferrer"
+                                      onClick={(e) => handleLinkClick(e, section.ctaUrl)}
                                       className="inline-flex items-center gap-1.5 p-2 px-5 rounded-none text-[9px] font-mono uppercase tracking-widest transition duration-200 hover:opacity-90"
                                       style={{
                                         backgroundColor: colors.primaryButtonBg,
@@ -615,7 +693,10 @@ export default function PreviewCanvas({
                               {section.ctaText && (
                                 <div className="pt-2">
                                   <a
-                                    href={section.ctaUrl || '#'}
+                                    href={normalizeUrl(section.ctaUrl)}
+                                    target={getLinkTarget(section.ctaUrl)}
+                                    rel="noopener noreferrer"
+                                    onClick={(e) => handleLinkClick(e, section.ctaUrl)}
                                     className="inline-flex items-center gap-1.5 p-2.5 px-6 rounded-none text-[10px] font-mono uppercase tracking-widest transition"
                                     style={{
                                       backgroundColor: colors.primaryButtonBg,
@@ -673,7 +754,10 @@ export default function PreviewCanvas({
                             {section.ctaText && (
                               <div className="pt-2">
                                 <a
-                                  href={section.ctaUrl || '#'}
+                                  href={normalizeUrl(section.ctaUrl)}
+                                  target={getLinkTarget(section.ctaUrl)}
+                                  rel="noopener noreferrer"
+                                  onClick={(e) => handleLinkClick(e, section.ctaUrl)}
                                   className="inline-flex items-center gap-1.5 p-2 px-5 rounded-none text-[10px] uppercase font-mono tracking-widest transition"
                                   style={{
                                     backgroundColor: colors.primaryButtonBg,
@@ -687,13 +771,26 @@ export default function PreviewCanvas({
                             )}
                           </div>
                           <div className={`${section.imagePosition === 'right' ? 'md:order-2' : 'md:order-1'}`}>
-                            <img 
-                              src={section.imageUrl || 'https://images.unsplash.com/photo-1507238691740-187a5b1d37b8?auto=format&fit=crop&w=800&q=80'} 
-                              alt={section.title}
-                              referrerPolicy="no-referrer"
-                              className="w-full h-56 object-cover rounded-none border"
-                              style={{ borderColor: colors.dividerColor }}
-                            />
+                            <div className="relative group">
+                              <img 
+                                src={section.imageUrl || 'https://images.unsplash.com/photo-1507238691740-187a5b1d37b8?auto=format&fit=crop&w=800&q=80'} 
+                                alt={section.title}
+                                referrerPolicy="no-referrer"
+                                className="w-full h-56 object-cover rounded-none border transition-all duration-350 group-hover:brightness-95"
+                                style={{ borderColor: colors.dividerColor }}
+                              />
+                              {/* Google Sites Image Carousel Active Dot & Navigation indicator bar */}
+                              <div className="mt-3 flex flex-col items-center justify-center space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="w-2 h-2 rounded-full inline-block border border-black/25 shadow-xs transition" style={{ backgroundColor: colors.carouselActiveDotColor }} title="Active slide dot indicator" />
+                                  <span className="w-1.5 h-1.5 rounded-full inline-block bg-slate-300 hover:bg-slate-400 cursor-pointer" title="Slide 2 indicator" />
+                                  <span className="w-1.5 h-1.5 rounded-full inline-block bg-slate-300 hover:bg-slate-400 cursor-pointer" title="Slide 3 indicator" />
+                                </div>
+                                <span className="text-[9px] uppercase tracking-wider text-slate-400 font-mono" style={smallTextStyle}>
+                                  Google Sites Carousel active dot demonstration
+                                </span>
+                              </div>
+                            </div>
                           </div>
                         </div>
                       )}
@@ -850,7 +947,10 @@ export default function PreviewCanvas({
                             {section.items?.map((item) => (
                               <a 
                                 key={item.id}
-                                href={item.url || '#'}
+                                href={normalizeUrl(item.url)}
+                                target={getLinkTarget(item.url)}
+                                rel="noopener noreferrer"
+                                onClick={(e) => handleLinkClick(e, item.url)}
                                 className="p-3.5 border rounded-none hover:scale-[1.01] hover:brightness-95 transition flex items-center justify-between text-left shadow-xs bg-white"
                                 style={{
                                   backgroundColor: colors.primaryBg,
@@ -945,7 +1045,10 @@ export default function PreviewCanvas({
                               <div key={item.id} className="space-y-1">
                                 <span className="text-[9px] uppercase font-mono tracking-widest text-[#413A36] block">{item.title}</span>
                                 <a 
-                                  href={item.url || '#'} 
+                                  href={normalizeUrl(item.url)} 
+                                  target={getLinkTarget(item.url)}
+                                  rel="noopener noreferrer"
+                                  onClick={(e) => handleLinkClick(e, item.url)}
                                   className="text-[11px] font-serif italic hover:underline block hover:opacity-100 opacity-80"
                                   style={{ color: colors.primaryButtonBg }}
                                 >
@@ -1111,6 +1214,20 @@ export default function PreviewCanvas({
               Google Sites may restrict direct embedded previewing under strict frame headers. Click <strong>OPEN OUTSIDE ↗</strong> above to launch and inspect side-by-side!
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Floating Interactive Toast Message Block */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 bg-[#1A1A1A] text-white p-3 px-5 border border-black shadow-lg flex items-center gap-3 transition-all duration-300 animate-slide-up rounded-none font-sans text-xs">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+          <p className="font-medium tracking-tight m-0">{toastMessage}</p>
+          <button 
+            onClick={() => setToastMessage(null)} 
+            className="ml-2 font-mono text-[10px] text-slate-400 hover:text-white uppercase tracking-wider"
+          >
+            Dismiss
+          </button>
         </div>
       )}
     </div>

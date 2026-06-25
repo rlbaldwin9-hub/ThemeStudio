@@ -21,13 +21,19 @@ export default function TypographyControls({ settings, onChange, colors }: Typog
   };
 
   const sectionsList: { key: keyof TypographySettings; label: string; desc: string }[] = [
-    { key: 'title', label: 'Page Titles', desc: 'Main headers, Hero titles, and large landing page headlines.' },
-    { key: 'heading', label: 'Section Headings', desc: 'Category titles, feature titles, and section subtitle headers.' },
-    { key: 'body', label: 'Body Paragraphs', desc: 'Detailed descriptions, card items, lists, and footer links.' },
+    { key: 'title', label: 'Page Title', desc: 'Main title banner text and key header landing text.' },
+    { key: 'heading', label: 'Heading', desc: 'Main title for sections, large module labels.' },
+    { key: 'subheading', label: 'Subheading', desc: 'Slightly smaller label text for secondary cards and headers.' },
+    { key: 'body', label: 'Normal Text', desc: 'Main descriptions, paragraphs, lists, and navigation.' },
+    { key: 'smallText', label: 'Small Text', desc: 'Fine print, footer credits, item captions, and tags.' },
   ];
 
   const getNormalizePxValue = (sizeStr: string, key: keyof TypographySettings): string => {
-    const fallback = key === 'title' ? '48px' : key === 'heading' ? '24px' : '14px';
+    const fallback = 
+      key === 'title' ? '48px' : 
+      key === 'heading' ? '24px' : 
+      key === 'subheading' ? '18px' : 
+      key === 'body' ? '14px' : '11px';
     if (!sizeStr) return fallback;
     const match = sizeStr.match(/^([\d.]+)(.*)$/);
     if (!match) return sizeStr;
@@ -46,7 +52,19 @@ export default function TypographyControls({ settings, onChange, colors }: Typog
     if (key === 'title') {
       return all.filter(sz => parseInt(sz) >= 18);
     }
+    if (key === 'heading') {
+      return all.filter(sz => parseInt(sz) >= 14);
+    }
     return all;
+  };
+
+  const getFallbackColor = (key: keyof TypographySettings): string => {
+    if (key === 'title') return colors?.titleColor || colors?.headingColor || '#1F1B18';
+    if (key === 'heading') return colors?.headingColor || '#1F1B18';
+    if (key === 'subheading') return colors?.subheadingColor || colors?.headingColor || '#5C544E';
+    if (key === 'body') return colors?.bodyTextColor || colors?.textColor || '#3A3530';
+    if (key === 'smallText') return colors?.smallTextColor || colors?.textColor || '#7C736C';
+    return '#000000';
   };
 
   return (
@@ -59,6 +77,9 @@ export default function TypographyControls({ settings, onChange, colors }: Typog
       <div className="space-y-5 max-h-[55vh] overflow-y-auto pr-1.5 custom-scrollbar">
         {sectionsList.map(({ key, label, desc }) => {
           const font = settings[key];
+          if (!font) return null;
+          const fallbackColor = getFallbackColor(key);
+
           return (
             <div key={key} className="p-4 bg-[#FDFCFB] rounded-none border border-[#E5E2DE] space-y-3">
               <div className="flex items-center justify-between">
@@ -155,7 +176,7 @@ export default function TypographyControls({ settings, onChange, colors }: Typog
                       Font Color
                     </label>
                     <div className="flex items-center gap-1.5">
-                      <span className="text-[9px] font-mono font-bold text-slate-500 uppercase bg-slate-50 px-1 py-0.5 border border-slate-100">
+                      <span className="text-[9px] font-mono font-bold text-slate-500 uppercase bg-slate-50 px-1 py-0.5 border border-slate-100 font-mono">
                         {font.color ? font.color : 'Theme Default'}
                       </span>
                       {font.color && (
@@ -175,7 +196,7 @@ export default function TypographyControls({ settings, onChange, colors }: Typog
                       <input
                         id={`font-color-picker-${key}`}
                         type="color"
-                        value={font.color || (key === 'body' ? (colors?.textColor || '#3A3530') : (colors?.headingColor || '#1F1B18'))}
+                        value={font.color || fallbackColor}
                         onChange={(e) => updateFontConfig(key, 'color', e.target.value)}
                         className="absolute inset-0 w-[200%] h-[200%] -translate-x-[25%] -translate-y-[25%] cursor-pointer border-0 p-0"
                       />
@@ -199,7 +220,7 @@ export default function TypographyControls({ settings, onChange, colors }: Typog
                   fontFamily: `"${font.family}", sans-serif`,
                   fontWeight: font.weight,
                   letterSpacing: font.letterSpacing,
-                  color: font.color || (key === 'body' ? (colors?.textColor || '#3A3530') : (colors?.headingColor || '#1F1B18'))
+                  color: font.color || fallbackColor
                 }}
               >
                 Sample Text Preview
@@ -213,7 +234,7 @@ export default function TypographyControls({ settings, onChange, colors }: Typog
         <HelpCircle className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
         <p className="text-[10px] text-slate-500 leading-normal">
           <strong className="font-serif italic font-bold text-[#1A1A1A] uppercase tracking-wider block mb-0.5">Design Guideline</strong>
-          Google Sites enforces title, heading, and body styles. When custom themes are built in Sites, these maps will line up directly with your custom text settings panel options!
+          Google Sites enforces Page Title, Heading, Subheading, Normal Text, and Small Text styles. When custom themes are built in Sites, these font maps will line up directly with your custom text settings panel options!
         </p>
       </div>
     </div>

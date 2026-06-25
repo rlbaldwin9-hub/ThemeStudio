@@ -11,10 +11,95 @@ interface ExportPanelProps {
   sections: Section[];
 }
 
+const normalizeUrl = (url: string | undefined): string => {
+  if (!url) return '#';
+  const trimmed = url.trim();
+  if (trimmed === '' || trimmed === '#') return '#';
+  
+  if (
+    /^(https?:)?\/\//i.test(trimmed) || 
+    trimmed.startsWith('#') || 
+    trimmed.startsWith('/') || 
+    trimmed.startsWith('mailto:') || 
+    trimmed.startsWith('tel:')
+  ) {
+    return trimmed;
+  }
+  
+  if (trimmed.includes('.') && !trimmed.includes(' ')) {
+    return `https://${trimmed}`;
+  }
+  
+  return trimmed;
+};
+
+const getLinkTarget = (url: string | undefined): string => {
+  if (!url) return '_self';
+  const norm = normalizeUrl(url);
+  if (norm.startsWith('#')) return '_self';
+  return '_blank';
+};
+
 export default function ExportPanel({ colors, typography, sections }: ExportPanelProps) {
   const [activeTab, setActiveTab] = useState<'json' | 'css' | 'html-embed' | 'html-full' | 'guide'>('json');
   const [selectedEmbedSecId, setSelectedEmbedSecId] = useState<string>(sections[0]?.id || '');
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const [selectedFullPageSecIds, setSelectedFullPageSecIds] = useState<string[] | null>(null);
+  const [pageHeightMode, setPageHeightMode] = useState<'scroll-container' | 'fill-screen' | 'natural' | 'fixed-height'>('scroll-container');
+  const [customPixelHeight, setCustomPixelHeight] = useState<number>(1800);
+  const [scrollbarMode, setScrollbarMode] = useState<'styled-show' | 'hide'>('styled-show');
+
+  // Get active sections representing the custom rows in order
+  const activeSectionsAll = sections.filter(s => !s.hidden);
+
+  // Resolve actual selected row IDs
+  const resolvedSelectedIds = selectedFullPageSecIds !== null
+    ? selectedFullPageSecIds.filter(id => activeSectionsAll.some(s => s.id === id))
+    : activeSectionsAll.map(s => s.id);
+
+  // Helper to estimate total pixel height based on currently selected blocks
+  const estimatedHeight = (() => {
+    const selectedSecs = sections.filter(s => !s.hidden && resolvedSelectedIds.includes(s.id));
+    if (selectedSecs.length === 0) return 800;
+    
+    return selectedSecs.reduce((sum, sec) => {
+      let h = 500; // baseline height estimate
+      if (sec.type === 'hero') {
+        h = sec.subtitle ? 650 : 500;
+      }
+      else if (sec.type === 'features') {
+        const rowCount = Math.ceil((sec.items?.length || 3) / 3);
+        h = 240 + rowCount * 220;
+      }
+      else if (sec.type === 'split') {
+        h = 600;
+      }
+      else if (sec.type === 'two-col') {
+        const rowCount = Math.ceil((sec.items?.length || 2) / 2);
+        h = 240 + rowCount * 240;
+      }
+      else if (sec.type === 'bento') {
+        h = 750;
+      }
+      else if (sec.type === 'faq') {
+        h = 220 + (sec.items?.length || 3) * 110;
+      }
+      else if (sec.type === 'testimonials') {
+        h = 500;
+      }
+      else if (sec.type === 'pricing') {
+        h = 600;
+      }
+      else if (sec.type === 'link-in-bio') {
+        h = 550;
+      }
+      else if (sec.type === 'footer') {
+        h = 250;
+      }
+      return sum + h;
+    }, 100); // 100px base padding
+  })();
 
   // Trigger brief copied checkmark animation
   const handleCopyText = (id: string, text: string) => {
@@ -131,7 +216,7 @@ export default function ExportPanel({ colors, typography, sections }: ExportPane
     <h1 class="hero-title">${sec.title}</h1>
     ${sec.subtitle ? `<p class="hero-subtitle">${sec.subtitle}</p>` : ''}
     ${sec.content ? `<p class="hero-body">${sec.content}</p>` : ''}
-    ${sec.ctaText ? `<a href="${sec.ctaUrl || '#'}" class="cta-button" target="_parent">${sec.ctaText}</a>` : ''}
+    ${sec.ctaText ? `<a href="${normalizeUrl(sec.ctaUrl)}" class="cta-button" target="${getLinkTarget(sec.ctaUrl)}">${sec.ctaText}</a>` : ''}
   </div>`;
     } else if (sec.type === 'features') {
       const itemsHtml = sec.items?.map(item => `
@@ -156,7 +241,7 @@ export default function ExportPanel({ colors, typography, sections }: ExportPane
       <h2 class="section-heading">${sec.title}</h2>
       ${sec.subtitle ? `<div class="p-accent">${sec.subtitle}</div>` : ''}
       <p class="body-paragraphs">${sec.content || ''}</p>
-      ${sec.ctaText ? `<a href="${sec.ctaUrl || '#'}" class="cta-button" target="_parent">${sec.ctaText}</a>` : ''}
+      ${sec.ctaText ? `<a href="${normalizeUrl(sec.ctaUrl)}" class="cta-button" target="${getLinkTarget(sec.ctaUrl)}">${sec.ctaText}</a>` : ''}
     </div>
     <div class="split-image-holder">
       <img src="${sec.imageUrl || 'https://images.unsplash.com/photo-1507238691740-187a5b1d37b8?auto=format&fit=crop&w=800&q=80'}" class="image-media" alt="Featured Media" />
@@ -231,7 +316,7 @@ export default function ExportPanel({ colors, typography, sections }: ExportPane
   </div>`;
     } else if (sec.type === 'link-in-bio') {
       const itemsHtml = sec.items?.map(it => `
-    <a href="${it.url || '#'}" class="link-bio-row" target="_parent">
+    <a href="${normalizeUrl(it.url)}" class="link-bio-row" target="${getLinkTarget(it.url)}">
       <div>
         <span class="bio-title">${it.title}</span>
         <span class="bio-desc">${it.description}</span>
@@ -272,7 +357,7 @@ export default function ExportPanel({ colors, typography, sections }: ExportPane
       const itemsHtml = sec.items?.map(it => `
       <div>
         <span class="foot-header">${it.title}</span>
-        <a href="${it.url || '#'}" class="foot-guide-item" target="_parent">${it.description}</a>
+        <a href="${normalizeUrl(it.url)}" class="foot-guide-item" target="${getLinkTarget(it.url)}">${it.description}</a>
       </div>`).join('') || '';
 
       sectionInnerHtml = `
@@ -775,8 +860,11 @@ export default function ExportPanel({ colors, typography, sections }: ExportPane
   };
 
   const compileFullPageEmbedCode = () => {
-    const activeSections = sections.filter(s => !s.hidden);
-    if (activeSections.length === 0) return '<!-- No active rows to embed. Add some rows first in the active sidebar list! -->';
+    const activeSections = sections.filter(s => !s.hidden && resolvedSelectedIds.includes(s.id));
+    if (activeSections.length === 0) {
+      return `<!-- No rows selected to embed! -->
+<!-- Please pick which layout blocks you want in your Page Code from the custom row builder panel below. -->`;
+    }
 
     const fontsToLoad = Array.from(new Set([
       typography.title.family,
@@ -797,7 +885,7 @@ export default function ExportPanel({ colors, typography, sections }: ExportPane
       <h1 class="hero-title">${sec.title}</h1>
       ${sec.subtitle ? `<p class="hero-subtitle">${sec.subtitle}</p>` : ''}
       ${sec.content ? `<p class="hero-body">${sec.content}</p>` : ''}
-      ${sec.ctaText ? `<a href="${sec.ctaUrl || '#'}" class="cta-button" target="_parent">${sec.ctaText}</a>` : ''}
+      ${sec.ctaText ? `<a href="${normalizeUrl(sec.ctaUrl)}" class="cta-button" target="${getLinkTarget(sec.ctaUrl)}">${sec.ctaText}</a>` : ''}
     </div>
   </div>`;
         } else {
@@ -806,7 +894,7 @@ export default function ExportPanel({ colors, typography, sections }: ExportPane
     <h1 class="hero-title">${sec.title}</h1>
     ${sec.subtitle ? `<p class="hero-subtitle">${sec.subtitle}</p>` : ''}
     ${sec.content ? `<p class="hero-body">${sec.content}</p>` : ''}
-    ${sec.ctaText ? `<a href="${sec.ctaUrl || '#'}" class="cta-button" target="_parent">${sec.ctaText}</a>` : ''}
+    ${sec.ctaText ? `<a href="${normalizeUrl(sec.ctaUrl)}" class="cta-button" target="${getLinkTarget(sec.ctaUrl)}">${sec.ctaText}</a>` : ''}
   </div>`;
         }
       } else if (sec.type === 'features') {
@@ -832,7 +920,7 @@ export default function ExportPanel({ colors, typography, sections }: ExportPane
       <h2 class="section-heading">${sec.title}</h2>
       ${sec.subtitle ? `<div class="p-accent">${sec.subtitle}</div>` : ''}
       <p class="body-paragraphs">${sec.content || ''}</p>
-      ${sec.ctaText ? `<a href="${sec.ctaUrl || '#'}" class="cta-button" target="_parent">${sec.ctaText}</a>` : ''}
+      ${sec.ctaText ? `<a href="${normalizeUrl(sec.ctaUrl)}" class="cta-button" target="${getLinkTarget(sec.ctaUrl)}">${sec.ctaText}</a>` : ''}
     </div>
     <div class="split-image-holder">
       <img src="${sec.imageUrl || 'https://images.unsplash.com/photo-1507238691740-187a5b1d37b8?auto=format&fit=crop&w=800&q=80'}" class="image-media" alt="Featured Media" />
@@ -907,7 +995,7 @@ export default function ExportPanel({ colors, typography, sections }: ExportPane
   </div>`;
       } else if (sec.type === 'link-in-bio') {
         const itemsHtml = sec.items?.map(it => `
-    <a href="${it.url || '#'}" class="link-bio-row" target="_parent">
+    <a href="${normalizeUrl(it.url)}" class="link-bio-row" target="${getLinkTarget(it.url)}">
       <div>
         <span class="bio-title">${it.title}</span>
         <span class="bio-desc">${it.description}</span>
@@ -948,7 +1036,7 @@ export default function ExportPanel({ colors, typography, sections }: ExportPane
         const itemsHtml = sec.items?.map(it => `
       <div>
         <span class="foot-header">${it.title}</span>
-        <a href="${it.url || '#'}" class="foot-guide-item" target="_parent">${it.description}</a>
+        <a href="${normalizeUrl(it.url)}" class="foot-guide-item" target="${getLinkTarget(it.url)}">${it.description}</a>
       </div>`).join('') || '';
 
         sectionInnerHtml = `
@@ -988,14 +1076,72 @@ export default function ExportPanel({ colors, typography, sections }: ExportPane
       padding: 0;
     }
     
-    html, body {
+    html {
+      height: ${pageHeightMode === 'scroll-container' ? '100%' : (pageHeightMode === 'fill-screen' ? '100%' : 'auto')};
+      max-height: ${pageHeightMode === 'scroll-container' ? '100%' : 'none'};
+      overflow: ${pageHeightMode === 'scroll-container' ? 'hidden' : (scrollbarMode === 'hide' ? 'hidden' : 'auto')} !important;
+    }
+    
+    body {
       font-family: "${typography.body.family}", sans-serif;
       font-size: ${typography.body.size};
       color: ${colors.textColor};
       background-color: ${colors.primaryBg};
       line-height: 1.5;
       -webkit-font-smoothing: antialiased;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      ${pageHeightMode === 'scroll-container' ? `
+      height: 100%;
+      max-height: 100%;
+      overflow-y: ${scrollbarMode === 'hide' ? 'hidden' : 'auto'} !important;
+      overflow-x: hidden;
+      ` : pageHeightMode === 'fill-screen' ? `
+      min-height: 100vh;
+      overflow-y: ${scrollbarMode === 'hide' ? 'hidden' : 'auto'} !important;
+      ` : pageHeightMode === 'fixed-height' ? `
+      height: ${customPixelHeight}px;
+      min-height: ${customPixelHeight}px;
+      overflow-y: ${scrollbarMode === 'hide' ? 'hidden' : 'auto'} !important;
+      ` : `
+      min-height: 100%;
+      height: auto;
+      overflow-y: ${scrollbarMode === 'hide' ? 'hidden' : 'auto'} !important;
+      `}
     }
+
+    /* Cross-browser scrollbar fallback */
+    html, body {
+      scrollbar-width: ${scrollbarMode === 'hide' ? 'none' : 'thin'} !important;
+      scrollbar-color: ${colors.primaryButtonBg} ${colors.secondaryBg} !important;
+    }
+
+    /* Force styling of custom scrollbar within the Google Sites embed iframe */
+    ${scrollbarMode === 'styled-show' ? `
+    ::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
+    }
+    ::-webkit-scrollbar-track {
+      background: ${colors.secondaryBg};
+    }
+    ::-webkit-scrollbar-thumb {
+      background-color: ${colors.primaryButtonBg};
+      border-radius: 6px;
+      border: 2px solid ${colors.secondaryBg};
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background-color: ${colors.headingColor};
+    }
+    ` : `
+    ::-webkit-scrollbar {
+      display: none;
+      width: 0px;
+      background: transparent;
+    }
+    `}
 
     /* Full-screen aesthetic row-by-row structure */
     .outer-section {
@@ -1497,9 +1643,7 @@ export default function ExportPanel({ colors, typography, sections }: ExportPane
   </style>
 </head>
 <body>
-  
   ${activeSectionsHtml}
-
 </body>
 </html>`;
   };
@@ -1509,13 +1653,16 @@ export default function ExportPanel({ colors, typography, sections }: ExportPane
 
   // File Download simulation triggers
   const triggerDownloadObj = (fileName: string, content: string) => {
-    const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(content);
+    const mimeType = fileName.endsWith('.json') ? 'application/json' : 'text/html';
+    const blob = new Blob([content], { type: mimeType + ';charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.setAttribute('href', dataUri);
+    link.setAttribute('href', url);
     link.setAttribute('download', fileName);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -1674,30 +1821,30 @@ export default function ExportPanel({ colors, typography, sections }: ExportPane
 
       {activeTab === 'html-full' && (
         <div className="space-y-4 animation-fade-in text-left">
-          <div className="p-3.5 bg-emerald-50/50 border border-emerald-150 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="p-3.5 bg-emerald-50/50 border border-emerald-150 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="space-y-0.5">
               <span className="text-[10px] uppercase font-extrabold text-emerald-700 tracking-wider flex items-center gap-1">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                 Full Page Sub-Page Compiler
               </span>
-              <h4 className="text-xs font-bold text-slate-800">Export All Active Rows ({sections.filter(s => !s.hidden).length}) as Full-Page Embed</h4>
+              <h4 className="text-xs font-bold text-slate-800">Export Chosen Row Elements ({resolvedSelectedIds.length} blocks compiled)</h4>
               <p className="text-[11.5px] text-slate-500">Perfect for rendering entire seamless custom landing/sub-pages within a Google Sites full page EMBED iframe frame.</p>
             </div>
 
-            <div className="flex gap-2 shrink-0">
+            <div className="flex flex-wrap gap-2 shrink-0">
               <button
-                disabled={sections.filter(s => !s.hidden).length === 0}
+                disabled={resolvedSelectedIds.length === 0}
                 onClick={() => handleCopyText('fullpage', compileFullPageEmbedCode())}
-                className="p-1.5 px-3 border border-slate-200 hover:border-slate-350 bg-white font-bold rounded text-xs text-slate-700 flex items-center gap-1.5 focus:outline-none cursor-pointer"
+                className="p-1.5 px-3 border border-slate-200 hover:border-slate-350 bg-white font-bold rounded text-xs text-slate-700 flex items-center gap-1.5 focus:outline-none cursor-pointer disabled:opacity-40"
                 id="btn-copy-fullpage-code"
               >
                 {copiedId === 'fullpage' ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
                 {copiedId === 'fullpage' ? 'Copied Full HTML!' : 'Copy Page Code'}
               </button>
               <button
-                disabled={sections.filter(s => !s.hidden).length === 0}
+                disabled={resolvedSelectedIds.length === 0}
                 onClick={() => triggerDownloadObj('google-sites-embed-page.html', compileFullPageEmbedCode())}
-                className="p-1.5 px-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-45 disabled:pointer-events-none rounded text-xs font-bold text-white flex items-center gap-1.5 focus:outline-none cursor-pointer"
+                className="p-1.5 px-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:pointer-events-none rounded text-xs font-bold text-white flex items-center gap-1.5 focus:outline-none cursor-pointer"
                 id="btn-download-fullpage"
               >
                 <Download className="w-3.5 h-3.5" />
@@ -1706,13 +1853,246 @@ export default function ExportPanel({ colors, typography, sections }: ExportPane
             </div>
           </div>
 
-          <div className="text-[11px] text-slate-600 leading-relaxed bg-slate-50 p-3 border border-slate-200">
-            <h5 className="font-bold text-slate-700 mb-1">🚀 How to Deploy Full Page Sub-Pages on Google Sites:</h5>
-            <ol className="list-decimal pl-4 space-y-1">
-              <li>In Google Sites editor, go to the <strong>Pages</strong> tab (right panel) &gt; Click the <strong>"+"</strong> button &gt; Select <strong>"Full page embed"</strong> (icon with brackets).</li>
-              <li>Give your new page a name (e.g., <em>"About Us"</em> or <em>"Custom Pricing"</em>) and click <strong>Done</strong>.</li>
-              <li>On the new blank page canvas, click the <strong>Add Embed</strong> button &gt; Select the <strong>"Embed Code"</strong> tab.</li>
-              <li>Paste the full-page HTML code copied below (or open the downloaded <code>google-sites-embed-page.html</code> file and copy all its contents) &gt; click <strong>Next</strong> &gt; click <strong>Insert</strong>.</li>
+          {/* Google Sites Scroll Limitation Note */}
+          <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-2.5 text-amber-900 shadow-xs">
+            <span className="text-base select-none mt-0.5" role="img" aria-label="warning">💡</span>
+            <div className="space-y-0.5">
+              <h5 className="text-[11.5px] font-extrabold text-amber-950 uppercase tracking-wide">Google Sites Editor & Preview Note</h5>
+              <p className="text-[11.5px] text-amber-800 leading-normal">
+                The **Google Sites sandbox preview window (unpublished editor view after saving)** is known to restrict custom scrolling height, hiding some of your deeper elements inside the draft browser framework. This is a standard Google security sandboxing behavior. **Rest assured: once you Publish your Google Site, the entire compiled page scrolls perfectly and renders flawlessly.**
+              </p>
+            </div>
+          </div>
+
+          {/* Sizing & Viewport Heights Controls */}
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+            <div>
+              <span className="text-[10px] font-extrabold uppercase text-slate-500 tracking-wider">📏 Custom Height & Screen Fitting Settings</span>
+              <h5 className="font-bold text-slate-800 text-xs">Prevent Google Sites Content Truncation</h5>
+              <p className="text-[11px] text-slate-500">Google Sites embeds default to limited heights and hide standard scrollbars if the iframe is longer than the browser slot. Force a set pixel canvas size or auto-scaling screen to ensure all blocks render beautifully.</p>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 pt-1">
+              <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-2 lg:col-span-6">
+                <span className="text-[10.5px] font-bold text-slate-700 block">Height Scaling Mode</span>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => setPageHeightMode('scroll-container')}
+                    type="button"
+                    className={`py-1.5 px-3 rounded text-[11.5px] font-bold transition focus:outline-none cursor-pointer border flex flex-col items-center justify-center text-center gap-0.5 ${pageHeightMode === 'scroll-container' ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'}`}
+                    title="Wraps page in an inner-canvas scrollbox. Resolves Google Sites' strict cutoff bugs perfectly!"
+                  >
+                    <span>🚀 Scroll Viewport</span>
+                    <span className={`text-[9px] font-normal ${pageHeightMode === 'scroll-container' ? 'text-indigo-100' : 'text-slate-550'}`}>(Fix Cuts / Recommended)</span>
+                  </button>
+                  <button
+                    onClick={() => setPageHeightMode('natural')}
+                    type="button"
+                    className={`py-1.5 px-3 rounded text-[11.5px] font-bold transition focus:outline-none cursor-pointer border flex flex-col items-center justify-center text-center gap-0.5 ${pageHeightMode === 'natural' ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'}`}
+                  >
+                    <span>Auto Natural Flow</span>
+                    <span className={`text-[9px] font-normal ${pageHeightMode === 'natural' ? 'text-indigo-100' : 'text-slate-550'}`}>(No restrictions)</span>
+                  </button>
+                  <button
+                    onClick={() => setPageHeightMode('fill-screen')}
+                    type="button"
+                    className={`py-1.5 px-3 rounded text-[11.5px] font-bold transition focus:outline-none cursor-pointer border flex flex-col items-center justify-center text-center gap-0.5 ${pageHeightMode === 'fill-screen' ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'}`}
+                  >
+                    <span>Fill Viewport</span>
+                    <span className={`text-[9px] font-normal ${pageHeightMode === 'fill-screen' ? 'text-indigo-100' : 'text-slate-550'}`}>(100vh window height)</span>
+                  </button>
+                  <button
+                    onClick={() => setPageHeightMode('fixed-height')}
+                    type="button"
+                    className={`py-1.5 px-3 rounded text-[11.5px] font-bold transition focus:outline-none cursor-pointer border flex flex-col items-center justify-center text-center gap-0.5 ${pageHeightMode === 'fixed-height' ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'}`}
+                  >
+                    <span>Fixed Canvas Size</span>
+                    <span className={`text-[9px] font-normal ${pageHeightMode === 'fixed-height' ? 'text-indigo-100' : 'text-slate-550'}`}>(Drag custom pixels slider)</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className={`bg-white border border-slate-200 rounded-lg p-3 space-y-2 lg:col-span-3 transition-opacity ${pageHeightMode === 'fixed-height' ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
+                <div className="flex justify-between items-center">
+                  <span className="text-[10.5px] font-bold text-slate-700">Set Custom Height</span>
+                  <span className="text-[10.5px] font-mono font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100">{customPixelHeight}px</span>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <input
+                    type="range"
+                    min={800}
+                    max={12000}
+                    step={100}
+                    value={customPixelHeight}
+                    disabled={pageHeightMode !== 'fixed-height'}
+                    onChange={(e) => setCustomPixelHeight(Number(e.target.value))}
+                    className="w-full accent-indigo-600 h-1.5 bg-slate-100 rounded-lg appearance-none cursor-pointer"
+                  />
+                </div>
+
+                <div className="flex justify-between text-[8px] text-slate-400 font-bold">
+                  <span>800px (Compact)</span>
+                  <span>12,000px (Tall Canvas)</span>
+                </div>
+              </div>
+
+              <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-2 lg:col-span-3">
+                <span className="text-[10.5px] font-bold text-slate-700 block">Iframe Scrollbars (Forced)</span>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => setScrollbarMode('styled-show')}
+                    type="button"
+                    className={`py-1.5 px-2 rounded text-[11px] font-bold transition focus:outline-none cursor-pointer border ${scrollbarMode === 'styled-show' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'}`}
+                  >
+                    Show Scrollbars
+                  </button>
+                  <button
+                    onClick={() => setScrollbarMode('hide')}
+                    type="button"
+                    className={`py-1.5 px-2 rounded text-[11px] font-bold transition focus:outline-none cursor-pointer border ${scrollbarMode === 'hide' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'}`}
+                  >
+                    Hide Scrollbars
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Google Sites Sizing Optimizer block */}
+            <div className="bg-slate-100/85 border border-slate-200/90 rounded-lg p-3 flex flex-col md:flex-row md:items-center justify-between gap-3 text-left">
+              <div className="space-y-0.5">
+                <span className="text-[9px] font-black uppercase text-indigo-700 tracking-wider">🔬 Google Sites Resizer Optimizer</span>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-xs font-bold text-slate-800">Selected Layout Height Estimate:</span>
+                  <span className="text-xs font-mono font-black text-indigo-700 bg-white border border-indigo-150 px-1.5 py-0.5 rounded shadow-xs">{estimatedHeight}px</span>
+                </div>
+                <p className="text-[10.5px] text-slate-500 leading-relaxed max-w-xl">
+                  Your active layout elements run deep. For an elegant **scrollbar-free render** within Google Sites, select **Fixed Canvas Size** mode and click the apply button. Then in your Google Sites editor, simply pull the bottom iframe resizing handle down until all elements fit perfectly.
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setPageHeightMode('fixed-height');
+                  setCustomPixelHeight(estimatedHeight);
+                }}
+                type="button"
+                className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 hover:shadow-xs text-white rounded text-xs font-extrabold focus:outline-none cursor-pointer transition shrink-0 border border-indigo-700"
+              >
+                Apply Height: {estimatedHeight}px
+              </button>
+            </div>
+
+            {pageHeightMode === 'fixed-height' && (
+              <div className="flex flex-wrap gap-1 bg-indigo-50/40 p-2 rounded border border-indigo-100/60 items-center">
+                <span className="text-[10px] font-bold text-indigo-700 mr-2">💡 Quick height templates:</span>
+                {[
+                  { label: "1800px (Recommended)", val: 1800 },
+                  { label: "3000px (Tall)", val: 3000 },
+                  { label: "4500px (Extra Tall)", val: 4500 },
+                  { label: "6500px (Long Landing)", val: 6500 },
+                  { label: "8500px (Deep Page)", val: 8500 },
+                  { label: "11000px (Max Height)", val: 11000 }
+                ].map(item => (
+                  <button
+                    key={item.label}
+                    onClick={() => setCustomPixelHeight(item.val)}
+                    disabled={pageHeightMode !== 'fixed-height'}
+                    type="button"
+                    className="px-2 py-0.5 bg-white hover:bg-slate-100 border border-slate-200 text-slate-600 rounded text-[9px] font-bold focus:outline-none cursor-pointer transition"
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Core Feature: Sub-Page Interactive Selector Grid */}
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200/60 pb-2">
+              <div>
+                <span className="text-[10px] font-extrabold uppercase text-slate-500 tracking-wider">🛠️ Interactive Layout Builder</span>
+                <h5 className="font-bold text-slate-800 text-xs">Choose Blocks to Add</h5>
+              </div>
+              <div className="flex flex-wrap gap-1.5 shrink-0">
+                <button
+                  onClick={() => setSelectedFullPageSecIds(activeSectionsAll.map(s => s.id))}
+                  className="px-2.5 py-1 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 rounded text-[10px] font-bold focus:outline-none cursor-pointer transition"
+                >
+                  Select All
+                </button>
+                <button
+                  onClick={() => setSelectedFullPageSecIds([])}
+                  className="px-2.5 py-1 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 rounded text-[10px] font-bold focus:outline-none cursor-pointer transition"
+                >
+                  Deselect All
+                </button>
+                <button
+                  onClick={() => setSelectedFullPageSecIds(activeSectionsAll.filter(s => s.type !== 'hero').map(s => s.id))}
+                  className="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded text-[10px] font-bold focus:outline-none cursor-pointer transition"
+                >
+                  ✨ Sub-Page (No Hero)
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-[220px] overflow-y-auto pr-1">
+              {activeSectionsAll.map((sec, idx) => {
+                const isSelected = resolvedSelectedIds.includes(sec.id);
+                return (
+                  <div
+                    key={sec.id}
+                    onClick={() => {
+                      if (isSelected) {
+                        setSelectedFullPageSecIds(resolvedSelectedIds.filter(id => id !== sec.id));
+                      } else {
+                        setSelectedFullPageSecIds([...resolvedSelectedIds, sec.id]);
+                      }
+                    }}
+                    className={`p-2.5 border rounded-lg cursor-pointer transition flex items-center gap-3 select-none ${isSelected ? 'bg-indigo-50/50 border-indigo-300 ring-1 ring-indigo-400/10' : 'bg-white border-slate-200 hover:border-slate-350 hover:bg-slate-50/40'}`}
+                  >
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => {}} // Swallowed: Click container handles toggle
+                        className="h-3.5 w-3.5 accent-indigo-600 rounded cursor-pointer"
+                      />
+                    </div>
+                    <div className="space-y-0.5 leading-tight min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[10px] font-bold px-1.5 py-0.2 bg-slate-100 text-slate-600 rounded uppercase tracking-wider">
+                          Row {idx + 1}
+                        </span>
+                        <span className="text-[9px] font-bold text-indigo-600 lowercase bg-indigo-50/50 px-1 py-0.2 rounded-sm border border-indigo-100/50">
+                          {sec.type}
+                        </span>
+                      </div>
+                      <h6 className="text-[11.5px] font-bold text-slate-800 truncate" title={sec.title}>
+                        {sec.title || `Untitled ${sec.type}`}
+                      </h6>
+                    </div>
+                  </div>
+                );
+              })}
+              {activeSectionsAll.length === 0 && (
+                <div className="col-span-full text-center py-6 text-slate-500 bg-white border border-dashed border-slate-200 rounded-lg">
+                  No active blocks available. Add or enable rows in the sidebar to start designing your sub-page templates!
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="text-[11px] text-slate-600 leading-relaxed bg-slate-50 p-3.5 border border-slate-200/80 rounded-xl space-y-1">
+            <h5 className="font-bold text-indigo-700 mb-1 flex items-center gap-1">
+              <span>🚀</span> Beginners Guide: How to deploy this sub-page in Google Sites
+            </h5>
+            <ol className="list-decimal pl-4 space-y-1 text-slate-600">
+              <li>In Google Sites editor, open the <strong>Pages</strong> tab in the right panel and click the <strong>"+"</strong> button at the bottom.</li>
+              <li>Hover and select the <strong>"Full page embed"</strong> option (symbolised by developer brackets <code>&lt;/&gt;</code>).</li>
+              <li>Name your custom sub-page (e.g., <em>"Our Services"</em> or <em>"Contact Us"</em>) and click <strong>Done</strong>.</li>
+              <li>On the new blank page, click the blue <strong>"Add Embed"</strong> button in the middle &gt; open the <strong>"Embed Code"</strong> tab.</li>
+              <li>Paste the compiled page code from below (click <strong>Copy Page Code</strong> or open your downloaded file) and hit <strong>Next &gt; Insert</strong>!</li>
             </ol>
           </div>
 
