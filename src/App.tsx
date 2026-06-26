@@ -7,6 +7,7 @@ import LayoutControls from './components/LayoutControls';
 import ThemeLibrary from './components/ThemeLibrary';
 import PreviewCanvas from './components/PreviewCanvas';
 import ExportPanel from './components/ExportPanel';
+import SidebarGenerator from './components/SidebarGenerator';
 import { 
   Palette, Type, Layers, FolderHeart, Sparkles, HelpCircle, 
   RotateCcw, ExternalLink, Moon, Sun, ArrowUpRight,
@@ -18,7 +19,7 @@ export default function App() {
   const [colors, setColors] = useState<ColorPalette>(normalizeColors(PRESET_THEMES[0].colors));
   const [typography, setTypography] = useState<TypographySettings>(normalizeTypography(PRESET_THEMES[0].typography));
   const [sections, setSections] = useState<Section[]>(INITIAL_SECTIONS);
-  const [activeSidebarTab, setActiveSidebarTab] = useState<'presets' | 'colors' | 'fonts' | 'sections' | 'library'>('presets');
+  const [activeSidebarTab, setActiveSidebarTab] = useState<'presets' | 'colors' | 'fonts' | 'sections' | 'library' | 'sidebar'>('presets');
   const [viewportMode, setViewportMode] = useState<ViewportMode>('desktop');
 
   // Custom persistent Header navigation states
@@ -172,11 +173,11 @@ export default function App() {
       {/* Main Designer Grid Workspace Layout */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 lg:p-7 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         
-        {/* Sidebar Controls Column (Desktop: 4 cols) */}
-        <section className="lg:col-span-4 bg-white border border-[#E5E2DE] rounded-none shadow-xs overflow-hidden flex flex-col shrink-0" id="sidebar-layout-column">
+        {/* Sidebar Controls Column (Desktop: 4 cols, expanded to 12 when editing Sidebar) */}
+        <section className={`${activeSidebarTab === 'sidebar' ? 'lg:col-span-12' : 'lg:col-span-4'} bg-white border border-[#E5E2DE] rounded-none shadow-xs overflow-hidden flex flex-col shrink-0 transition-all duration-300`} id="sidebar-layout-column">
           
           {/* Tabs header selector buttons */}
-          <div className="grid grid-cols-5 border-b border-[#E5E2DE] bg-white">
+          <div className="grid grid-cols-6 border-b border-[#E5E2DE] bg-white">
             <button
               onClick={() => setActiveSidebarTab('presets')}
               className={`py-3 text-[10px] uppercase tracking-wider font-bold transition duration-150 cursor-pointer focus:outline-none ${activeSidebarTab === 'presets' ? 'border-b-2 border-black text-black' : 'text-gray-400 hover:text-gray-600 font-medium'}`}
@@ -216,6 +217,14 @@ export default function App() {
               id="tab-sidebar-library"
             >
               <span>Library</span>
+            </button>
+            <button
+              onClick={() => setActiveSidebarTab('sidebar')}
+              className={`py-3 text-[10px] uppercase tracking-wider font-bold transition duration-150 cursor-pointer focus:outline-none ${activeSidebarTab === 'sidebar' ? 'border-b-2 border-black text-black' : 'text-gray-400 hover:text-gray-600 font-medium'}`}
+              title="Google Sites Sidebar Generator"
+              id="tab-sidebar-sidebar"
+            >
+              <span>Sidebar</span>
             </button>
           </div>
 
@@ -451,35 +460,41 @@ export default function App() {
                 }} 
               />
             )}
+
+            {activeSidebarTab === 'sidebar' && (
+              <SidebarGenerator colors={colors} typography={typography} />
+            )}
           </div>
         </section>
 
         {/* Live Device Preview and XML/CSS code Exporter Column (Desktop: 8 cols) */}
-        <section className="lg:col-span-8 flex flex-col justify-start" id="preview-layout-column">
-          
-          {/* Main Visual Responsive Preview Window */}
-          <PreviewCanvas 
-            colors={colors}
-            typography={typography}
-            sections={sections}
-            viewportMode={viewportMode}
-            onViewportChange={setViewportMode}
-            headerTitle={headerTitle}
-            headerCtaText={headerCtaText}
-            headerCtaUrl={headerCtaUrl}
-            comparisonUrl={comparisonUrl}
-            setComparisonUrl={setComparisonUrl}
-            showComparison={showComparison}
-            setShowComparison={setShowComparison}
-          />
+        {activeSidebarTab !== 'sidebar' && (
+          <section className="lg:col-span-8 flex flex-col justify-start" id="preview-layout-column">
+            
+            {/* Main Visual Responsive Preview Window */}
+            <PreviewCanvas 
+              colors={colors}
+              typography={typography}
+              sections={sections}
+              viewportMode={viewportMode}
+              onViewportChange={setViewportMode}
+              headerTitle={headerTitle}
+              headerCtaText={headerCtaText}
+              headerCtaUrl={headerCtaUrl}
+              comparisonUrl={comparisonUrl}
+              setComparisonUrl={setComparisonUrl}
+              showComparison={showComparison}
+              setShowComparison={setShowComparison}
+            />
 
-          {/* Code outputs exporters block and steps guide */}
-          <ExportPanel 
-            colors={colors}
-            typography={typography}
-            sections={sections}
-          />
-        </section>
+            {/* Code outputs exporters block and steps guide */}
+            <ExportPanel 
+              colors={colors}
+              typography={typography}
+              sections={sections}
+            />
+          </section>
+        )}
 
       </main>
 
